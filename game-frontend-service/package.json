@@ -1,0 +1,16 @@
+{
+  "name": "game-frontend-service",
+  "version": "1.0.0",
+  "description": "Frontend Microservice for Tic-Tac-Toe Simulation",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
+  }
+}

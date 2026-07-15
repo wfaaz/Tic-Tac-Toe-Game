@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic-Tac-Toe Microservice Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .cell-x { color: #3b82f6; text-shadow: 0 0 10px rgba(59, 130, 246, 0.3); }
+        .cell-o { color: #ef4444; text-shadow: 0 0 10px rgba(239, 68, 68, 0.3); }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between font-sans">
+
+    <header class="border-b border-slate-800 bg-slate-950/50 backdrop-blur py-4 px-6">
+        <div class="max-w-5xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold tracking-tight text-indigo-400">⚡ Flamingo Tic-Tac-Toe</h1>
+            <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-medium">Session Service UI (Port 8081)</span>
+        </div>
+    </header>
+
+    <main class="max-w-5xl w-full mx-auto p-6 grid grid-cols-1 md:grid-cols-3 gap-8 items-start my-auto">
+        
+        <div class="bg-slate-950/40 p-6 rounded-2xl border border-slate-800 space-y-6">
+            <h2 class="text-lg font-semibold text-slate-300">Simulation Control</h2>
+            
+            <div class="space-y-3">
+                <button id="start-btn" onclick="triggerSimulation()" class="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-150 shadow-lg shadow-indigo-500/20">
+                    🚀 Start Simulation
+                </button>
+            </div>
+
+            <div class="border-t border-slate-800 pt-4 space-y-3 text-sm">
+                <div class="flex justify-between"><span class="text-slate-400">Session ID:</span> <span id="session-id-display" class="font-mono text-slate-300">None</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">Player X (Engine):</span> <span class="text-blue-400 font-medium">player-abc</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">Player O (Engine):</span> <span class="text-red-400 font-medium">player-xyz</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">Match Status:</span> <span id="game-status" class="text-slate-500 italic">Idle</span></div>
+            </div>
+
+            <div id="error-banner" class="hidden bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl text-xs space-y-1">
+                <p class="font-bold">Communication Error:</p>
+                <p id="error-message"></p>
+            </div>
+        </div>
+
+        <div class="flex flex-col items-center">
+            <div class="bg-slate-950 p-6 rounded-3xl border-2 border-slate-800 shadow-2xl">
+                <div class="grid grid-cols-3 gap-3 w-72 h-72">
+                    <div id="cell-0-0" class="bg-slate-900 border border-slate-800/80 rounded-xl flex items-center justify-center text-4xl font-extrabold select-none transition-all duration-150"></div>
+                    <div id="cell-0-1" class="bg-slate-900 border border-slate-800/80 rounded-xl flex items-center justify-center text-4xl font-extrabold select-none transition-all duration-150"></div>
+                    <div id="cell-0-2" class="bg-slate-900 border border-slate-800/80 rounded-xl flex items-center justify-center text-4xl font-extrabold select-none transition-all duration-150"></div>
+                    <div id="cell-1-0" class="bg-slate-900 border border-slate-800/80 rounded-xl flex items-center justify-center text-4xl font-extrabold select-none transition-all duration-150"></div>
+                    <div id="cell-1-1" class="bg-slate-900 border border-slate-800/80 rounded-xl flex items-center justify-center text-4xl font-extrabold select-none transition-all duration-150"></div>
+                    <div id="cell-1-2" class="bg-slate-900 border border-slate-800/80 rounded-xl flex items-center justify-center text-4xl font-extrabold select-none transition-all duration-150"></div>
+                    <div id="cell-2-0" class="bg-slate-900 border border-slate-800/80 rounded-xl flex items-center justify-center text-4xl font-extrabold select-none transition-all duration-150"></div>
+                    <div id="cell-2-1" class="bg-slate-900 border border-slate-800/80 rounded-xl flex items-center justify-center text-4xl font-extrabold select-none transition-all duration-150"></div>
+                    <div id="cell-2-2" class="bg-slate-900 border border-slate-800/80 rounded-xl flex items-center justify-center text-4xl font-extrabold select-none transition-all duration-150"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-slate-950/40 p-6 rounded-2xl border border-slate-800 h-[360px] flex flex-col justify-between">
+            <h2 class="text-lg font-semibold text-slate-300 mb-3">Live Move Log</h2>
+            <div id="move-history-container" class="flex-grow overflow-y-auto space-y-2 text-xs font-mono text-slate-400 pr-2">
+                <div class="text-slate-600 italic">Waiting for simulation to begin...</div>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="border-t border-slate-800 py-4 px-6 text-center text-xs text-slate-500">
+        Engine and Coordinator Microservices | Standard H2 Storage | 2026
+    </footer>
+
+    <script>
+        const API_BASE = "http://localhost:8081/sessions";
+        let isSimulating = false;
+
+        async function triggerSimulation() {
+            if (isSimulating) return;
+            isSimulating = true;
+            
+            // UI Reset
+            clearBoard();
+            hideError();
+            document.getElementById("start-btn").disabled = true;
+            document.getElementById("start-btn").innerText = "⏳ Simulating...";
+            document.getElementById("move-history-container").innerHTML = "";
+            updateStatus("Creating Session...", "text-indigo-400");
+
+            try {		
+                // Step 1: Create a new Session
+                const sessionResponse = await fetch(API_BASE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ playerXId: "player-abc", playerOId: "player-xyz" })
+                });
+
+                if (!sessionResponse.ok) {
+					const errorText = await sessionResponse.text(); 
+					throw new Error(errorText || "Could not initialize session.");
+				}
+                const session = await sessionResponse.json();
+                document.getElementById("session-id-display").innerText = session.sessionId.substring(0, 8) + "...";
+
+                // Step 2: Trigger automated simulation loop
+                updateStatus("Engine playing...", "text-yellow-500");
+                const simulateResponse = await fetch(`${API_BASE}/${session.sessionId}/simulate`, {
+                    method: 'POST'
+                });
+
+                if (!simulateResponse.ok) {
+					const errorText = await sessionResponse.text(); 
+					throw new Error(errorText || "Simulation failed midway.");
+				}
+                const completedSession = await simulateResponse.json();
+
+                // Step 3: Replay the moves frame-by-frame with a delay
+                await replayMoves(completedSession.moveHistory);
+                
+                updateStatus(completedSession.gameResult, "text-emerald-400 font-bold");
+
+            } catch (err) {
+                showError(err.message);
+                updateStatus("Error", "text-red-500");
+            } finally {
+                document.getElementById("start-btn").disabled = false;
+                document.getElementById("start-btn").innerText = "🚀 Start Simulation";
+                isSimulating = false;
+            }
+        }
+
+        // Replays moves sequentially with an artificial pause (e.g. 800ms)
+        async function replayMoves(moveHistory) {
+            const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+            const logContainer = document.getElementById("move-history-container");
+
+            for (let i = 0; i < moveHistory.length; i++) {
+                const move = moveHistory[i];
+                
+                // Write symbol on board
+                const cell = document.getElementById(`cell-${move.boardRow}-${move.boardCol}`);
+                cell.innerText = move.symbol;
+                cell.className = `bg-slate-900 border border-slate-800/80 rounded-xl flex items-center justify-center text-4xl font-extrabold select-none transition-all duration-150 ${move.symbol === 'X' ? 'cell-x' : 'cell-o'}`;
+
+                // Append to Log UI
+                const timestamp = new Date(move.timestamp).toLocaleTimeString();
+                logContainer.innerHTML += `
+                    <div class="border-b border-slate-900 pb-1.5 flex justify-between">
+                        <span>[${timestamp}] Play: <strong>${move.symbol}</strong> at [${move.boardRow}, ${move.boardCol}]</span>
+                        <span class="${move.symbol === 'X' ? 'text-blue-400' : 'text-red-400'} font-semibold">${move.playerId.substring(7)}</span>
+                    </div>
+                `;
+                logContainer.scrollTop = logContainer.scrollHeight;
+
+                await delay(800); // Wait 800ms between each turn animation
+            }
+        }
+
+        function clearBoard() {
+            for (let r = 0; r < 3; r++) {
+                for (let c = 0; c < 3; c++) {
+                    const cell = document.getElementById(`cell-${r}-${c}`);
+                    cell.innerText = "";
+                    cell.className = "bg-slate-900 border border-slate-800/80 rounded-xl flex items-center justify-center text-4xl font-extrabold select-none transition-all duration-150";
+                }
+            }
+        }
+
+        function updateStatus(text, colorClass) {
+            const statusEl = document.getElementById("game-status");
+            statusEl.innerText = text;
+            statusEl.className = colorClass;
+        }
+
+        function showError(msg) {
+            const banner = document.getElementById("error-banner");
+            const text = document.getElementById("error-message");
+            text.innerText = msg;
+            banner.classList.remove("hidden");
+        }
+
+        function hideError() {
+            document.getElementById("error-banner").classList.add("hidden");
+        }
+    </script>
+</body>
+</html>
